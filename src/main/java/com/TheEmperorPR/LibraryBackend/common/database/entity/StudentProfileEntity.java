@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "student")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class StudentProfileEntity {
 
     @Id
