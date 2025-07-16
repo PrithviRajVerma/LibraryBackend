@@ -1,14 +1,12 @@
 package com.TheEmperorPR.LibraryBackend.common.Auth;
 
-import com.TheEmperorPR.LibraryBackend.common.database.dto.LoginRequest;
-import com.TheEmperorPR.LibraryBackend.common.database.dto.RegisterRequest;
-import com.TheEmperorPR.LibraryBackend.common.database.entity.AdminCred;
-import com.TheEmperorPR.LibraryBackend.common.database.entity.StaffCred;
-import com.TheEmperorPR.LibraryBackend.common.database.entity.StudentCred;
-import com.TheEmperorPR.LibraryBackend.common.database.repository.credRepo.AdminCredRepo;
-import com.TheEmperorPR.LibraryBackend.common.database.repository.credRepo.StaffCredRepo;
-import com.TheEmperorPR.LibraryBackend.common.database.repository.credRepo.StudentCredRepo;
+import com.TheEmperorPR.LibraryBackend.common.database.dto.SignInRequest;
+import com.TheEmperorPR.LibraryBackend.common.database.dto.SignUpRequest;
+import com.TheEmperorPR.LibraryBackend.common.database.entity.User;
+import com.TheEmperorPR.LibraryBackend.common.database.repository.credRepo.UserRepository;
+import jakarta.servlet.ServletOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -24,60 +22,82 @@ import java.util.Map;
 @RequestMapping("/auth")
 public class AuthController {
 
-    @Autowired private AdminCredRepo adminCredRepo;
-    @Autowired private StaffCredRepo staffCredRepo;
-    @Autowired private StudentCredRepo studentCredRepo;
+    @Autowired private UserRepository userRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private PasswordEncoder passwordEncoder;
 
     @PostMapping("/admin/register")
-    public ResponseEntity<?> registerAdmin(@RequestBody RegisterRequest request){
-        if(adminCredRepo.findByUsername(request.getUsername()).isPresent()){
+    public ResponseEntity<?> registerAdmin(@RequestBody SignUpRequest request){
+        if(userRepository.findByUsername(request.getUsername()).isPresent()){
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Admin already exists.");
         }
 
-        AdminCred adminCred = new AdminCred();
-        adminCred.setUsername(request.getUsername());
-        adminCred.setPassword(passwordEncoder.encode(request.getPassword()));
-        adminCredRepo.save(adminCred);
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole(request.getRole());
+        userRepository.save(user);
 
         return ResponseEntity.status(HttpStatus.OK).body("Admin Registered.");
     }
 
     @PostMapping("/admin/login")
-    public ResponseEntity<?> adminLogin(@RequestBody LoginRequest request){
-        AdminCred adminCred = adminCredRepo.findByUsername(request.getUsername())
+    public ResponseEntity<?> adminLogin(@RequestBody SignInRequest request){
+        User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("Admin Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),adminCred.getPassword())){
+        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
         }
 
-        String token = jwtUtil.generateToken(request.getUsername(),"ADMIN");
+        String token = jwtUtil.generateToken(
+                new CustomUserDetails(
+                        user.getId(),
+                        user.getPassword(),
+                        user.getUsername(),
+                        user.getRole()
+                )
+        );
 
         return ResponseEntity.ok(Map.of("token",token));
     }
 
+
+
     @PostMapping("/staff/login")
-    public ResponseEntity<?> staffLogin(@RequestBody LoginRequest request){
-        StaffCred staffCred = staffCredRepo.findByUsername(request.getUsername())
+    public ResponseEntity<?> staffLogin(@RequestBody SignInRequest request){
+        User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("Staff Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),staffCred.getPassword())){
+        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
         }
 
-        String token = jwtUtil.generateToken(request.getUsername(),"STAFF");
+        String token = jwtUtil.generateToken(
+                new CustomUserDetails(
+                        user.getId(),
+                        user.getPassword(),
+                        user.getUsername(),
+                        user.getRole()
+                )
+        );
         return ResponseEntity.ok(Map.of("token",token));
     }
 
     @PostMapping("/student/login")
-    public ResponseEntity<?> studentLogin(@RequestBody LoginRequest request){
-        StudentCred studentCred = studentCredRepo.findByUsername(request.getUsername())
+    public ResponseEntity<?> studentLogin(@RequestBody SignInRequest request){
+        User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("Student Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),studentCred.getPassword())){
+        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
         }
 
-        String token = jwtUtil.generateToken(request.getUsername(),"STUDENT");
+        String token = jwtUtil.generateToken(
+                new CustomUserDetails(
+                        user.getId(),
+                        user.getPassword(),
+                        user.getUsername(),
+                        user.getRole()
+                )
+        );
         return ResponseEntity.ok(Map.of("token",token));
     }
 

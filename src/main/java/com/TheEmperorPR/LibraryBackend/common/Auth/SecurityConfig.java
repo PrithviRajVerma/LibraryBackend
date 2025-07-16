@@ -1,5 +1,6 @@
 package com.TheEmperorPR.LibraryBackend.common.Auth;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -17,38 +18,36 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    private final JwtUtil jwtUtil;
+//    private final JwtUtil jwtUtil;
 
-    public SecurityConfig(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
+//    public SecurityConfig(JwtUtil jwtUtil) {
+//        this.jwtUtil = jwtUtil;
+//    }
+
+    private final JWTAuthorizationFilter jwtFilter;
+
+    public SecurityConfig(JWTAuthorizationFilter jwtFilter) {
+        System.out.println("✅ JWTAuthorizationFilter initialized");
+        this.jwtFilter = jwtFilter;
     }
 
     @Bean public PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public RoleHierarchy roleHierarchy(){
-        return RoleHierarchyImpl.fromHierarchy(
-                """
-                ROLE_ADMIN > ROLE_STAFF
-                ROLE_STAFF > ROLE_STUDENT
-                """
-        );
-    }
 
     @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authz -> authz
+                .authorizeHttpRequests(req -> req
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/staff/**").hasRole("STAFF")
+                .requestMatchers("/staff/**").hasAnyRole("STAFF","ADMIN")
                 .requestMatchers("/student/**").hasRole("STUDENT")
                 .anyRequest().authenticated()
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new JWTAuthorizationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
    }
