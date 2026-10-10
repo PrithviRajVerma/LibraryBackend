@@ -4,101 +4,98 @@ import com.TheEmperorPR.LibraryBackend.common.database.dto.SignInRequest;
 import com.TheEmperorPR.LibraryBackend.common.database.dto.SignUpRequest;
 import com.TheEmperorPR.LibraryBackend.common.database.entity.User;
 import com.TheEmperorPR.LibraryBackend.common.database.repository.credRepo.UserRepository;
-import jakarta.servlet.ServletOutputStream;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
+import com.TheEmperorPR.LibraryBackend.core.exception.DuplicateResourceException;
+import com.TheEmperorPR.LibraryBackend.core.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
+@Tag(name = "Authentication", description = "Endpoints for user login and admin registration")
 public class AuthController {
 
-    @Autowired private UserRepository userRepository;
-    @Autowired private JwtUtil jwtUtil;
-    @Autowired private PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/admin/register")
-    public ResponseEntity<?> registerAdmin(@RequestBody SignUpRequest request){
-        if(userRepository.findByUsername(request.getUsername()).isPresent()){
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Admin already exists.");
+    @Operation(summary = "Register the initial administrator account")
+    public ResponseEntity<ApiResponse<String>> registerAdmin(@Valid @RequestBody SignUpRequest request) {
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new DuplicateResourceException("Admin already exists with username: " + request.getUsername());
         }
 
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
+        User user = User.builder()
+                .username(request.getUsername())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(request.getRole())
+                .isActive(true)
+                .build();
         userRepository.save(user);
 
-        return ResponseEntity.status(HttpStatus.OK).body("Admin Registered.");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Admin Registered.", user.getUsername()));
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Unified login for Admin, Staff, and Students")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> login(@Valid @RequestBody SignInRequest request) {
+        return authenticateAndGenerateToken(request);
     }
 
     @PostMapping("/admin/login")
-    public ResponseEntity<?> adminLogin(@RequestBody SignInRequest request){
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new UsernameNotFoundException("Admin Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
-        }
-
-        String token = jwtUtil.generateToken(
-                new CustomUserDetails(
-                        user.getId(),
-                        user.getPassword(),
-                        user.getUsername(),
-                        user.getRole()
-                )
-        );
-
-        return ResponseEntity.ok(Map.of("token",token));
+    @Operation(summary = "Admin specific login endpoint")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> adminLogin(@Valid @RequestBody SignInRequest request) {
+        return authenticateAndGenerateToken(request);
     }
 
-
-
     @PostMapping("/staff/login")
-    public ResponseEntity<?> staffLogin(@RequestBody SignInRequest request){
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new UsernameNotFoundException("Staff Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
-        }
-
-        String token = jwtUtil.generateToken(
-                new CustomUserDetails(
-                        user.getId(),
-                        user.getPassword(),
-                        user.getUsername(),
-                        user.getRole()
-                )
-        );
-        return ResponseEntity.ok(Map.of("token",token));
+    @Operation(summary = "Staff specific login endpoint")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> staffLogin(@Valid @RequestBody SignInRequest request) {
+        return authenticateAndGenerateToken(request);
     }
 
     @PostMapping("/student/login")
-    public ResponseEntity<?> studentLogin(@RequestBody SignInRequest request){
+    @Operation(summary = "Student specific login endpoint")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> studentLogin(@Valid @RequestBody SignInRequest request) {
+        return authenticateAndGenerateToken(request);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> authenticateAndGenerateToken(SignInRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new UsernameNotFoundException("Student Not Found"));
-        if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials.");
+                .orElseThrow(() -> new UsernameNotFoundException("User Not Found"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Invalid Credentials.");
         }
 
         String token = jwtUtil.generateToken(
                 new CustomUserDetails(
                         user.getId(),
-                        user.getPassword(),
                         user.getUsername(),
+                        user.getPassword(),
                         user.getRole()
                 )
         );
-        return ResponseEntity.ok(Map.of("token",token));
-    }
 
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("token", token);
+        responseData.put("userId", user.getId());
+        responseData.put("username", user.getUsername());
+        responseData.put("role", user.getRole().name());
+
+        return ResponseEntity.ok(ApiResponse.success("Authentication successful", responseData));
+    }
 }
