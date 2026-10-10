@@ -25,10 +25,10 @@ public class CustomUserDetails implements UserDetails {
 
 
 
-    public CustomUserDetails(Long id, String password, String username, Role role) {
+    public CustomUserDetails(Long id, String username, String password, Role role) {
         this.id = id;
-        this.password = password;
         this.username = username;
+        this.password = password;
         this.role = role;
     }
 

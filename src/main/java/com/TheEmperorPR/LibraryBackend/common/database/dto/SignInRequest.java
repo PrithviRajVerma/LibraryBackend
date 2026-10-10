@@ -9,14 +9,11 @@ import lombok.Data;
 public class SignInRequest {
 
     @NotBlank
-    @NotNull
     private String username;
 
     @NotBlank
-    @NotNull
     private String password;
 
-    @NotBlank
     @NotNull
     private Role role;
 }

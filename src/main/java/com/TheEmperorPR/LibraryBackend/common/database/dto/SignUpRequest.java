@@ -10,14 +10,11 @@ import lombok.Getter;
 public class SignUpRequest {
 
     @NotBlank
-    @NotNull
     private String username;
 
     @NotBlank
-    @NotNull
     private String password;
 
-    @NotBlank
     @NotNull
     private Role role;
 }

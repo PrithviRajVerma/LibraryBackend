@@ -1,26 +1,29 @@
 package com.TheEmperorPR.LibraryBackend.common.database.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class BookRecordRequest {
 
-    @NotNull
     @NotBlank
     private String bookName;
 
     @NotBlank
-    @NotNull
     private String authorName;
 
-    @NotBlank
     private String edition;
 
     @NotBlank
-    @NotNull
-    private String Domain;
+    private String domain;
 
-    @NotBlank
     @NotNull
-    private int numberOfBook;
+    @Min(1)
+    private Integer numberOfBook;
 }

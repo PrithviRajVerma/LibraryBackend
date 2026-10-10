@@ -4,12 +4,18 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
-    private static final String SECRET_KEY = "secret123456";
+
+    @Value("${jwt.secret:secret123456}")
+    private String secretKey;
+
+    @Value("${jwt.expiration-hours:10}")
+    private long expirationHours;
 
     public String generateToken(CustomUserDetails user){
         return JWT.create()
@@ -17,12 +23,12 @@ public class JwtUtil {
                 .withClaim("id",user.getId())
                 .withClaim("role",user.getRole().toString())
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 10 *60*60*1000))
-                .sign(Algorithm.HMAC256(SECRET_KEY));
+                .withExpiresAt(new Date(System.currentTimeMillis() + expirationHours * 60 * 60 * 1000))
+                .sign(Algorithm.HMAC256(secretKey));
     }
 
     public DecodedJWT extractDecodedJwt(String token) {
-        return JWT.require(Algorithm.HMAC256(SECRET_KEY))
+        return JWT.require(Algorithm.HMAC256(secretKey))
                 .build()
                 .verify(token);
     }
